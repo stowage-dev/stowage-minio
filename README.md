@@ -9,17 +9,18 @@ by the AGPL.
 
 ## What gets built
 
-For every new upstream tag, one binary is produced for each target in
-`buildscripts/cross-compile.sh` upstream:
+For every new upstream tag, one binary is produced for each platform in
+upstream's official multi-arch Docker image manifest (Linux only):
 
-| OS       | Architectures                                              |
-| -------- | ---------------------------------------------------------- |
-| linux    | amd64, arm64, arm, 386, ppc64le, s390x, riscv64, mips, mips64 |
-| darwin   | amd64, arm64                                               |
-| windows  | amd64                                                      |
-| freebsd  | amd64                                                      |
-| netbsd   | amd64                                                      |
-| openbsd  | amd64                                                      |
+| OS    | Architectures                  |
+| ----- | ------------------------------ |
+| linux | amd64, arm64, ppc64le, s390x   |
+
+These are exactly the platforms `docker pull minio/minio` resolves to, so each
+binary maps 1:1 to a `linux/<arch>` Docker target. To extend coverage (e.g.
+`linux/arm`, `linux/riscv64`, or non-Docker targets like darwin/windows),
+add entries to the `matrix.target` list in
+`.github/workflows/build-release.yml`.
 
 Each release contains:
 

@@ -45,22 +45,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Targets that map to a Docker/OCI image platform. Mirrors the
+        # platforms published in upstream's official multi-arch image
+        # (docker.io/minio/minio): linux only, amd64 / arm64 / ppc64le / s390x.
         target:
-          - { goos: linux,   goarch: amd64 }
-          - { goos: linux,   goarch: arm64 }
-          - { goos: linux,   goarch: arm    }
-          - { goos: linux,   goarch: '386'  }
-          - { goos: linux,   goarch: ppc64le }
-          - { goos: linux,   goarch: s390x  }
-          - { goos: linux,   goarch: riscv64 }
-          - { goos: linux,   goarch: mips   }
-          - { goos: linux,   goarch: mips64 }
-          - { goos: darwin,  goarch: amd64  }
-          - { goos: darwin,  goarch: arm64  }
-          - { goos: windows, goarch: amd64  }
-          - { goos: freebsd, goarch: amd64  }
-          - { goos: netbsd,  goarch: amd64  }
-          - { goos: openbsd, goarch: amd64  }
+          - { goos: linux, goarch: amd64   }
+          - { goos: linux, goarch: arm64   }
+          - { goos: linux, goarch: ppc64le }
+          - { goos: linux, goarch: s390x   }
     steps:
       - name: Checkout MinIO at tag
         uses: actions/checkout@v4
@@ -101,10 +93,7 @@ jobs:
           LDFLAGS: ${{ steps.ldflags.outputs.flags }}
         run: |
           set -euo pipefail
-
-          ext=""
-          if [[ "${GOOS}" == "windows" ]]; then ext=".exe"; fi
-          out="minio-${GOOS}-${GOARCH}${ext}"
+          out="minio-${GOOS}-${GOARCH}"
 
           go build -tags kqueue -trimpath \
             --ldflags "${LDFLAGS}" \
