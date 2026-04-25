@@ -1,0 +1,64 @@
+name: Check upstream MinIO for new releases
+
+on:
+  schedule:
+    # Hourly. MinIO ships several releases per month.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Force-build a specific upstream tag (skip the diff check)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: write   # needed to dispatch build-release.yml
+
+concurrency:
+  group: check-upstream
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine upstream tag to build
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${FORCE_TAG}" ]]; then
+            echo "Using forced tag: ${FORCE_TAG}"
+            echo "tag=${FORCE_TAG}" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Latest release on upstream.
+          upstream_tag=$(gh api repos/minio/minio/releases/latest --jq .tag_name)
+          echo "Latest upstream tag: ${upstream_tag}"
+
+          # Do we already have a release for this tag?
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${upstream_tag}" \
+              --silent >/dev/null 2>&1; then
+            echo "Release ${upstream_tag} already exists in this repo. Nothing to do."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New tag detected: ${upstream_tag}"
+            echo "tag=${upstream_tag}" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dispatch build workflow
+        if: steps.pick.outputs.should_build == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.pick.outputs.tag }}
+        run: |
+          gh workflow run build-release.yml \
+            --ref "${GITHUB_REF_NAME}" \
+            -f tag="${TAG}"

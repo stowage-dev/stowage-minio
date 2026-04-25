@@ -1,0 +1,195 @@
+name: Build and release MinIO
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Upstream MinIO tag to build (e.g. RELEASE.2025-01-01T00-00-00Z)'
+        required: true
+        type: string
+
+permissions:
+  contents: write   # to create the release
+
+concurrency:
+  group: build-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ inputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Resolve upstream commit for tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/minio/minio/git/refs/tags/${TAG}" --jq .object.sha)
+          # If it's an annotated tag, the ref points at the tag object; resolve to commit.
+          obj_type=$(gh api "repos/minio/minio/git/tags/${sha}" --jq .object.type 2>/dev/null || echo "commit")
+          if [[ "${obj_type}" == "commit" ]]; then
+            commit=$(gh api "repos/minio/minio/git/tags/${sha}" --jq .object.sha)
+            sha="${commit}"
+          fi
+          echo "Upstream tag ${TAG} -> commit ${sha}"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          - { goos: linux,   goarch: arm    }
+          - { goos: linux,   goarch: '386'  }
+          - { goos: linux,   goarch: ppc64le }
+          - { goos: linux,   goarch: s390x  }
+          - { goos: linux,   goarch: riscv64 }
+          - { goos: linux,   goarch: mips   }
+          - { goos: linux,   goarch: mips64 }
+          - { goos: darwin,  goarch: amd64  }
+          - { goos: darwin,  goarch: arm64  }
+          - { goos: windows, goarch: amd64  }
+          - { goos: freebsd, goarch: amd64  }
+          - { goos: netbsd,  goarch: amd64  }
+          - { goos: openbsd, goarch: amd64  }
+    steps:
+      - name: Checkout MinIO at tag
+        uses: actions/checkout@v4
+        with:
+          repository: minio/minio
+          ref: ${{ needs.prepare.outputs.tag }}
+          fetch-depth: 0   # gen-ldflags.go uses `git describe`
+          path: minio
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: minio/go.mod
+          check-latest: true
+
+      - name: Build
+        working-directory: minio
+        env:
+          CGO_ENABLED: '0'
+          GOOS:   ${{ matrix.target.goos }}
+          GOARCH: ${{ matrix.target.goarch }}
+        run: |
+          set -euo pipefail
+          ldflags=$(go run buildscripts/gen-ldflags.go)
+
+          ext=""
+          if [[ "${GOOS}" == "windows" ]]; then ext=".exe"; fi
+          out="minio-${GOOS}-${GOARCH}${ext}"
+
+          go build -tags kqueue -trimpath \
+            --ldflags "${ldflags}" \
+            -o "../${out}" \
+            ./
+
+          sha256sum "../${out}" | tee "../${out}.sha256"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minio-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
+          path: |
+            minio-${{ matrix.target.goos }}-${{ matrix.target.goarch }}*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (for NOTICE template)
+        uses: actions/checkout@v4
+
+      - name: Checkout MinIO at tag (for source tarball + LICENSE)
+        uses: actions/checkout@v4
+        with:
+          repository: minio/minio
+          ref: ${{ needs.prepare.outputs.tag }}
+          path: upstream
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Stage release assets
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+
+          # Flatten artifacts/<name>/* -> release/
+          find artifacts -type f -print0 | xargs -0 -I{} cp {} release/
+
+          # Aggregate per-binary checksums into a single SHA256SUMS.
+          ( cd release && cat ./*.sha256 | awk '{print $1, $2}' \
+              | sed 's| \./| |' | sort -k2 > SHA256SUMS && rm -f ./*.sha256 )
+
+          # Pristine source tarball at the exact tag (AGPL §6 corresponding source).
+          git -C upstream archive --format=tar.gz \
+            --prefix="minio-${TAG}/" \
+            -o "release/minio-${TAG}-source.tar.gz" \
+            "${TAG}"
+
+          # Upstream LICENSE, unmodified.
+          cp upstream/LICENSE release/LICENSE
+
+          # NOTICE with provenance.
+          GO_VERSION=$(go version 2>/dev/null | awk '{print $3}' || echo "see release run")
+          export UPSTREAM_TAG="${TAG}" UPSTREAM_SHA="${SHA}" \
+                 BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                 BUILD_RUN_URL="${RUN_URL}" GO_VERSION
+          envsubst < NOTICE.template > release/NOTICE
+
+          ls -la release/
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+        run: |
+          set -euo pipefail
+          notes=$(cat <<EOF
+          Automated build of [minio/minio@${TAG}](https://github.com/minio/minio/releases/tag/${TAG}).
+
+          - Upstream commit: \`${SHA}\`
+          - Build run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          ## License
+
+          MinIO is licensed under the GNU AGPL v3. The unmodified upstream
+          \`LICENSE\` is included as a release asset. The full corresponding
+          source for these binaries is included as
+          \`minio-${TAG}-source.tar.gz\`, satisfying AGPL §6(d).
+
+          ## Verification
+
+          \`SHA256SUMS\` contains checksums for every binary in this release.
+          Builds use \`-trimpath\` and \`CGO_ENABLED=0\`; rebuilding from the
+          included source tarball with the same Go toolchain (recorded in
+          \`NOTICE\`) yields identical binaries.
+          EOF
+          )
+
+          gh release create "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "MinIO ${TAG}" \
+            --notes "${notes}" \
+            release/*
