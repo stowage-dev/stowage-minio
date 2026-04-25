@@ -148,9 +148,11 @@ jobs:
 
           # Pristine source tarball at the exact tag (AGPL §6 corresponding source).
           # Stable filename (no tag) so /releases/latest/download/ resolves it.
+          # `-o` is resolved relative to the repo dir `git -C` enters, so use an
+          # absolute path back to the workflow workdir.
           git -C upstream archive --format=tar.gz \
             --prefix="minio-${TAG}/" \
-            -o "release/minio-source.tar.gz" \
+            -o "${GITHUB_WORKSPACE}/release/minio-source.tar.gz" \
             "${TAG}"
 
           # Upstream LICENSE, unmodified.
