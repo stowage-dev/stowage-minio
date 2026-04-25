@@ -147,9 +147,10 @@ jobs:
               | sed 's| \./| |' | sort -k2 > SHA256SUMS && rm -f ./*.sha256 )
 
           # Pristine source tarball at the exact tag (AGPL §6 corresponding source).
+          # Stable filename (no tag) so /releases/latest/download/ resolves it.
           git -C upstream archive --format=tar.gz \
             --prefix="minio-${TAG}/" \
-            -o "release/minio-${TAG}-source.tar.gz" \
+            -o "release/minio-source.tar.gz" \
             "${TAG}"
 
           # Upstream LICENSE, unmodified.
@@ -182,7 +183,7 @@ jobs:
           MinIO is licensed under the GNU AGPL v3. The unmodified upstream
           \`LICENSE\` is included as a release asset. The full corresponding
           source for these binaries is included as
-          \`minio-${TAG}-source.tar.gz\`, satisfying AGPL §6(d).
+          \`minio-source.tar.gz\`, satisfying AGPL §6(d).
 
           ## Verification
 
@@ -193,8 +194,12 @@ jobs:
           EOF
           )
 
+          # --latest=true forces this release to be the one served by
+          # /releases/latest/download/<asset>. MinIO's RELEASE.<timestamp>
+          # tags don't sort as semver, so gh's auto-detect is unreliable.
           gh release create "${TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
             --title "MinIO ${TAG}" \
             --notes "${notes}" \
+            --latest=true \
             release/*

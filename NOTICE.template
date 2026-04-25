@@ -23,9 +23,10 @@ license text is included in this release as LICENSE.
 Corresponding Source
 --------------------
 The complete, unmodified source code corresponding to the binaries in this
-release is included in this release as `minio-${UPSTREAM_TAG}-source.tar.gz`.
-This satisfies the obligation in AGPL §6(d) to offer equivalent access to the
-Corresponding Source from the same place at no further charge.
+release is included in this release as `minio-source.tar.gz` (the upstream
+tag is recorded above). This satisfies the obligation in AGPL §6(d) to offer
+equivalent access to the Corresponding Source from the same place at no
+further charge.
 
 Verification
 ------------

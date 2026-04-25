@@ -24,9 +24,9 @@ add entries to the `matrix.target` list in
 
 Each release contains:
 
-- `minio-<os>-<arch>[.exe]` — the binary
+- `minio-<os>-<arch>` — the binary
 - `SHA256SUMS` — checksums for every binary
-- `minio-<tag>-source.tar.gz` — pristine upstream source at the exact tag
+- `minio-source.tar.gz` — pristine upstream source at the exact tag
   (this is what AGPL §6 requires us to publish alongside the binaries)
 - `LICENSE` — the upstream AGPL v3 license text
 - `NOTICE` — provenance: upstream commit SHA, build flags, Go version
@@ -65,6 +65,44 @@ list of releases we have already published in this repository. If the tag is
 new, it dispatches `build-release.yml` with that tag. Idempotent: re-running
 when nothing has changed is a no-op.
 
+## Stable download URLs
+
+Each release is published with `--latest=true`, so GitHub's
+`/releases/latest/download/<asset>` redirect always resolves to the
+most-recent build. These URLs are stable — bookmark or hard-code them in
+other workflows:
+
+```
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-amd64
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-arm64
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-ppc64le
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-s390x
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/SHA256SUMS
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/LICENSE
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/NOTICE
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-source.tar.gz
+```
+
+(For a specific tag, swap `latest/download` for `download/<tag>`.)
+
+### Consuming from another GitHub Actions workflow
+
+```yaml
+- name: Install MinIO (verified)
+  run: |
+    set -euo pipefail
+    base=https://github.com/stowage-dev/stowage-minio/releases/latest/download
+    curl -fsSL -o minio        "${base}/minio-linux-amd64"
+    curl -fsSL -o SHA256SUMS   "${base}/SHA256SUMS"
+    grep ' minio-linux-amd64$' SHA256SUMS | sha256sum -c -
+    chmod +x minio
+    sudo mv minio /usr/local/bin/minio
+```
+
+The `sha256sum -c -` step is what makes this safe across the redirect: even
+though the download URL is mutable, every release pins the binaries' digests
+in `SHA256SUMS`, so a tampered or stale binary is rejected.
+
 ## License compliance (AGPL v3)
 
 MinIO is licensed under the [GNU AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html).
@@ -76,7 +114,7 @@ the resulting binaries still imposes obligations on us:
 2. **Provide Corresponding Source.** GPL §6(d) (incorporated by AGPL) lets us
    satisfy this by "offering equivalent access to the Corresponding Source in
    the same way through the same place at no further charge". Each release
-   therefore includes `minio-<tag>-source.tar.gz` — a pristine `git archive`
+   therefore includes `minio-source.tar.gz` — a pristine `git archive`
    of the upstream tag.
 3. **Document provenance.** `NOTICE` records the upstream commit SHA, the Go
    toolchain version, and the build flags so anyone can verify or reproduce
