@@ -198,6 +198,19 @@ jobs:
           EOF
           )
 
+          # If a release with this tag already exists (e.g. a manual
+          # re-dispatch after a failed build), delete it first so we
+          # can publish fresh assets. --cleanup-tag also removes the
+          # underlying git tag in this repo so `gh release create`
+          # below recreates it cleanly. No-op when nothing exists.
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Replacing existing release ${TAG}"
+            gh release delete "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --cleanup-tag \
+              --yes
+          fi
+
           # --latest=true forces this release to be the one served by
           # /releases/latest/download/<asset>. MinIO's RELEASE.<timestamp>
           # tags don't sort as semver, so gh's auto-detect is unreliable.
