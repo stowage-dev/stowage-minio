@@ -60,5 +60,6 @@ jobs:
           TAG: ${{ steps.pick.outputs.tag }}
         run: |
           gh workflow run build-release.yml \
+            --repo "${GITHUB_REPOSITORY}" \
             --ref "${GITHUB_REF_NAME}" \
             -f tag="${TAG}"
