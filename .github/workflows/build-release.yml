@@ -100,14 +100,11 @@ jobs:
             -o "../${out}" \
             ./
 
-          sha256sum "../${out}" | tee "../${out}.sha256"
-
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: minio-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
-          path: |
-            minio-${{ matrix.target.goos }}-${{ matrix.target.goarch }}*
+          path: minio-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
           if-no-files-found: error
           retention-days: 7
 
@@ -142,10 +139,6 @@ jobs:
           # Flatten artifacts/<name>/* -> release/
           find artifacts -type f -print0 | xargs -0 -I{} cp {} release/
 
-          # Aggregate per-binary checksums into a single SHA256SUMS.
-          ( cd release && cat ./*.sha256 | awk '{print $1, $2}' \
-              | sed 's| \./| |' | sort -k2 > SHA256SUMS && rm -f ./*.sha256 )
-
           # Pristine source tarball at the exact tag (AGPL §6 corresponding source).
           # Stable filename (no tag) so /releases/latest/download/ resolves it.
           # `-o` is resolved relative to the repo dir `git -C` enters, so use an
@@ -154,6 +147,11 @@ jobs:
             --prefix="minio-${TAG}/" \
             -o "${GITHUB_WORKSPACE}/release/minio-source.tar.gz" \
             "${TAG}"
+
+          # Generate SHA256SUMS in canonical `<hash>  <basename>` form, in one
+          # pass over everything in release/. Running from inside the dir keeps
+          # paths to bare basenames (no `./` or `../`), so `sha256sum -c` works.
+          ( cd release && sha256sum minio-* | LC_ALL=C sort -k2 > SHA256SUMS )
 
           # Upstream LICENSE, unmodified.
           cp upstream/LICENSE release/LICENSE
