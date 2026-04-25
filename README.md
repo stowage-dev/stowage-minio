@@ -9,22 +9,23 @@ by the AGPL.
 
 ## What gets built
 
-For every new upstream tag, one binary is produced for each platform in
-upstream's official multi-arch Docker image manifest (Linux only):
+For every new upstream tag, one binary is produced for each platform below.
+The Linux set mirrors upstream's official multi-arch Docker image manifest;
+Windows is included for native installs on Windows hosts.
 
-| OS    | Architectures                  |
-| ----- | ------------------------------ |
-| linux | amd64, arm64, ppc64le, s390x   |
+| OS      | Architectures                  |
+| ------- | ------------------------------ |
+| linux   | amd64, arm64, ppc64le, s390x   |
+| windows | amd64                          |
 
-These are exactly the platforms `docker pull minio/minio` resolves to, so each
-binary maps 1:1 to a `linux/<arch>` Docker target. To extend coverage (e.g.
-`linux/arm`, `linux/riscv64`, or non-Docker targets like darwin/windows),
-add entries to the `matrix.target` list in
-`.github/workflows/build-release.yml`.
+The Linux entries are exactly the platforms `docker pull minio/minio`
+resolves to, so each maps 1:1 to a `linux/<arch>` Docker target. To extend
+coverage (e.g. `linux/arm`, `linux/riscv64`, darwin), add entries to the
+`matrix.target` list in `.github/workflows/build-release.yml`.
 
 Each release contains:
 
-- `minio-<os>-<arch>` — the binary
+- `minio-<os>-<arch>` (or `minio-windows-amd64.exe`) — the binary
 - `SHA256SUMS` — checksums for every binary
 - `minio-source.tar.gz` — pristine upstream source at the exact tag
   (this is what AGPL §6 requires us to publish alongside the binaries)
@@ -77,6 +78,7 @@ https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linu
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-arm64
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-ppc64le
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-s390x
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-windows-amd64.exe
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/SHA256SUMS
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/LICENSE
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/NOTICE
