@@ -11,16 +11,17 @@ by the AGPL.
 
 For every new upstream tag, one binary is produced for each platform below.
 The Linux set mirrors upstream's official multi-arch Docker image manifest;
-Windows is included for native installs on Windows hosts.
+Windows and macOS are included for native installs on those hosts.
 
 | OS      | Architectures                  |
 | ------- | ------------------------------ |
 | linux   | amd64, arm64, ppc64le, s390x   |
 | windows | amd64                          |
+| darwin  | amd64, arm64                   |
 
 The Linux entries are exactly the platforms `docker pull minio/minio`
 resolves to, so each maps 1:1 to a `linux/<arch>` Docker target. To extend
-coverage (e.g. `linux/arm`, `linux/riscv64`, darwin), add entries to the
+coverage (e.g. `linux/arm`, `linux/riscv64`), add entries to the
 `matrix.target` list in `.github/workflows/build-release.yml`.
 
 Each release contains:
@@ -79,6 +80,8 @@ https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linu
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-ppc64le
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-linux-s390x
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-windows-amd64.exe
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-darwin-amd64
+https://github.com/stowage-dev/stowage-minio/releases/latest/download/minio-darwin-arm64
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/SHA256SUMS
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/LICENSE
 https://github.com/stowage-dev/stowage-minio/releases/latest/download/NOTICE
